@@ -87,3 +87,40 @@ console.log(data);
 app.listen(3000, () => {
     console.log("Servidor corriendo en http://localhost:3000");
 });
+
+// ===== WEBHOOK MERCADOPAGO =====
+app.post("/webhook", async (req, res) => {
+  try {
+    console.log("🔔 WEBHOOK RECIBIDO");
+    console.log(req.body);
+
+    const paymentId = req.body?.data?.id;
+
+    if (!paymentId) {
+      return res.sendStatus(200);
+    }
+
+    // Consultar el pago real a MercadoPago
+    const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      headers: {
+        Authorization: `Bearer ${ACCESS_TOKEN}`,
+      },
+    });
+
+    const payment = await response.json();
+
+    console.log("💰 PAGO DETALLE:");
+    console.log(payment.status);
+    console.log(payment.transaction_amount);
+
+    if (payment.status === "approved") {
+      console.log("✅ PAGO APROBADO — GUARDAR PEDIDO");
+      // aquí luego guardaremos pedidos
+    }
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error("Error webhook:", error);
+    res.sendStatus(500);
+  }
+});
