@@ -55,10 +55,10 @@ app.post("/create-preference", async (req, res) => {
             body: JSON.stringify({
                 items: req.body.items,
                 back_urls: {
-                    success: "http://localhost:5500/success.html",
-                    failure: "http://localhost:5500/failure.html",
-                    pending: "http://localhost:5500/pending.html",
-                },
+                    success: "https://ytzjakdiaz.github.io/VibeWear/files/success.html",
+                    failure: "https://ytzjakdiaz.github.io/VibeWear/files/failure.html",
+                    pending: "https://ytzjakdiaz.github.io/VibeWear/files/pending.html",
+            },
                 auto_return: "approved",
             }),
         });
