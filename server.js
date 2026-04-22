@@ -2,7 +2,17 @@ import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
 import mongoose from "mongoose";
-import Order from "./models/Order.js";
+
+const orderSchema = new mongoose.Schema({
+  payment_id: Number,
+  date: String,
+  amount: Number,
+  status: String,
+  buyer_id: Number,
+  items: Array,
+});
+
+const Order = mongoose.model("Order", orderSchema);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
