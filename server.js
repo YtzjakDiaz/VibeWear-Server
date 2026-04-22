@@ -4,7 +4,7 @@ import cors from "cors";
 import mongoose from "mongoose";
 
 const orderSchema = new mongoose.Schema({
-  payment_id: Number,
+  payment_id: { type: Number, unique: true }, // 👈 evita duplicados a nivel DB
   date: String,
   amount: Number,
   status: String,
@@ -148,6 +148,15 @@ app.post("/webhook", async (req, res) => {
       console.log(payment.transaction_amount);
 
       if (payment.status === "approved") {
+
+        // 🔥 EVITAR DUPLICADOS
+        const existingOrder = await Order.findOne({ payment_id: payment.id });
+
+        if (existingOrder) {
+          console.log("⚠️ Pedido ya existe, no duplicar");
+          return res.sendStatus(200);
+        }
+
         console.log("✅ PAGO APROBADO — GUARDANDO PEDIDO");
 
         const newOrder = {
