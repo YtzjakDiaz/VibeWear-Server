@@ -2,6 +2,7 @@ import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
 import fs from "fs";
+import mongoose from "mongoose";
 
 const app = express();
 const PORT = 3000;
@@ -84,6 +85,10 @@ console.log(data);
         res.status(500).json({ error: "Error creando preferencia" });
     }
 });
+
+mongoose.connect(process.env.MONGO_URL)
+  .then(() => console.log("🟢 MongoDB conectado"))
+  .catch(err => console.log("🔴 Error MongoDB:", err));
 
 app.listen(3000, () => {
     console.log("Servidor corriendo en http://localhost:3000");
