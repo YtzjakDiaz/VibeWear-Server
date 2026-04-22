@@ -94,17 +94,14 @@ app.post("/webhook", async (req, res) => {
     console.log("🔔 WEBHOOK RECIBIDO");
     console.log(req.body);
 
-    // MercadoPago envía MUCHOS eventos → solo queremos PAGOS
-    if (req.body.type !== "payment") {
-      console.log("Evento ignorado:", req.body.type);
-      return res.sendStatus(200);
-    }
+    // ID de merchant order que envía MercadoPago
+    const merchantOrderId = req.body?.id;
 
-    const paymentId = req.body.data.id;
+    if (!merchantOrderId) return res.sendStatus(200);
 
-    // Consultar el pago real a MercadoPago
+    // Consultar la orden en MercadoPago
     const response = await fetch(
-      `https://api.mercadopago.com/v1/payments/${paymentId}`,
+      `https://api.mercadopago.com/merchant_orders/${merchantOrderId}`,
       {
         headers: {
           Authorization: `Bearer ${ACCESS_TOKEN}`,
@@ -112,16 +109,34 @@ app.post("/webhook", async (req, res) => {
       }
     );
 
-    const payment = await response.json();
+    const order = await response.json();
 
-    console.log("💰 DETALLE DEL PAGO:");
-    console.log("Estado:", payment.status);
-    console.log("Monto:", payment.transaction_amount);
-    console.log("Email comprador:", payment.payer.email);
+    console.log("📦 ORDEN MERCADOPAGO:");
+    console.log(order);
 
-    if (payment.status === "approved") {
-      console.log("✅ PAGO APROBADO — GUARDAR PEDIDO");
-      // aquí en el siguiente paso guardaremos pedidos reales
+    // Ver si hay pagos dentro de la orden
+    if (order.payments && order.payments.length > 0) {
+      const paymentId = order.payments[0].id;
+
+      // Consultar el pago real
+      const paymentRes = await fetch(
+        `https://api.mercadopago.com/v1/payments/${paymentId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${ACCESS_TOKEN}`,
+          },
+        }
+      );
+
+      const payment = await paymentRes.json();
+
+      console.log("💰 PAGO DETALLE:");
+      console.log(payment.status);
+      console.log(payment.transaction_amount);
+
+      if (payment.status === "approved") {
+        console.log("✅ PAGO APROBADO — GUARDAR PEDIDO");
+      }
     }
 
     res.sendStatus(200);
