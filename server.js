@@ -44,7 +44,7 @@ app.get("/test-payment", async (req, res) => {
     }
 });
 
-const ACCESS_TOKEN = "APP_USR-4721285442073566-041917-23754951322e0ac9a2364ef88e4eeab9-3346852400";
+const ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
 
 app.post("/create-preference", async (req, res) => {
     try {
