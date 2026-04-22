@@ -1,98 +1,98 @@
 import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
-import fs from "fs";
 import mongoose from "mongoose";
+import Order from "./models/Order.js";
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
+// Middlewares
 app.use(cors());
 app.use(express.json());
 
+// Test básico
 app.get("/", (req, res) => {
-    res.json({ message: "Servidor corriendo correctamente" });
+  res.json({ message: "Servidor corriendo correctamente" });
 });
+
+// ===== TEST DE PAGO =====
 app.get("/test-payment", async (req, res) => {
-    try {
-        const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${ACCESS_TOKEN}`,
-            },
-            body: JSON.stringify({
-                items: [
-                    {
-                        title: "Producto de prueba",
-                        quantity: 1,
-                        currency_id: "COP",
-                        unit_price: 10000
-                    }
-                ],
-            }),
-        });
-
-        const data = await response.json();
-        res.send(`
-            <h1>Preferencia creada</h1>
-            <a href="${data.init_point}" target="_blank">Pagar con MercadoPago</a>
-        `);
-    } catch (error) {
-        console.error(error);
-        res.send("Error creando preferencia");
-    }
-});
-
-const ACCESS_TOKEN = process.env.MP_ACCESS_TOKEN;
-
-app.post("/create-preference", async (req, res) => {
-    try {
-        const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${ACCESS_TOKEN}`,
-            },
-            body: JSON.stringify({
-                items: req.body.items,
-                back_urls: {
-                    success: "https://ytzjakdiaz.github.io/VibeWear/files/success.html",
-                    failure: "https://ytzjakdiaz.github.io/VibeWear/files/failure.html",
-                    pending: "https://ytzjakdiaz.github.io/VibeWear/files/pending.html",
-            },
-                auto_return: "approved",
-            }),
-        });
-
-const data = await response.json();
-
-console.log("Respuesta MercadoPago:");
-console.log(data);
-
-// Si MercadoPago devuelve error, lo enviamos al frontend
-        if (!data.init_point) {
-        return res.status(400).json({
-        error: "MercadoPago error",
-        details: data
+  try {
+    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+      },
+      body: JSON.stringify({
+        items: [
+          {
+            title: "Producto de prueba",
+            quantity: 1,
+            currency_id: "COP",
+            unit_price: 10000,
+          },
+        ],
+      }),
     });
-}
 
-        res.json({ init_point: data.init_point });
+    const data = await response.json();
 
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Error creando preferencia" });
+    res.send(`
+      <h1>Preferencia creada</h1>
+      <a href="${data.init_point}" target="_blank">Pagar con MercadoPago</a>
+    `);
+  } catch (error) {
+    console.error(error);
+    res.send("Error creando preferencia");
+  }
+});
+
+// ===== CREAR PAGO REAL =====
+app.post("/create-preference", async (req, res) => {
+  try {
+    const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
+      },
+      body: JSON.stringify({
+        items: req.body.items,
+        back_urls: {
+          success: "https://ytzjakdiaz.github.io/VibeWear/files/success.html",
+          failure: "https://ytzjakdiaz.github.io/VibeWear/files/failure.html",
+          pending: "https://ytzjakdiaz.github.io/VibeWear/files/pending.html",
+        },
+        auto_return: "approved",
+      }),
+    });
+
+    const data = await response.json();
+
+    console.log("Respuesta MercadoPago:");
+    console.log(data);
+
+    if (!data.init_point) {
+      return res.status(400).json({
+        error: "MercadoPago error",
+        details: data,
+      });
     }
+
+    res.json({ init_point: data.init_point });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Error creando preferencia" });
+  }
 });
 
-mongoose.connect(process.env.MONGO_URL)
+// ===== CONEXIÓN A MONGODB =====
+mongoose
+  .connect(process.env.MONGO_URL)
   .then(() => console.log("🟢 MongoDB conectado"))
-  .catch(err => console.log("🔴 Error MongoDB:", err));
-
-app.listen(3000, () => {
-    console.log("Servidor corriendo en http://localhost:3000");
-});
+  .catch((err) => console.log("🔴 Error MongoDB:", err));
 
 // ===== WEBHOOK MERCADOPAGO =====
 app.post("/webhook", async (req, res) => {
@@ -100,17 +100,15 @@ app.post("/webhook", async (req, res) => {
     console.log("🔔 WEBHOOK RECIBIDO");
     console.log(req.body);
 
-    // ID de merchant order que envía MercadoPago
     const merchantOrderId = req.body?.id;
-
     if (!merchantOrderId) return res.sendStatus(200);
 
-    // Consultar la orden en MercadoPago
+    // Obtener orden
     const response = await fetch(
       `https://api.mercadopago.com/merchant_orders/${merchantOrderId}`,
       {
         headers: {
-          Authorization: `Bearer ${ACCESS_TOKEN}`,
+          Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
         },
       }
     );
@@ -120,16 +118,15 @@ app.post("/webhook", async (req, res) => {
     console.log("📦 ORDEN MERCADOPAGO:");
     console.log(order);
 
-    // Ver si hay pagos dentro de la orden
     if (order.payments && order.payments.length > 0) {
       const paymentId = order.payments[0].id;
 
-      // Consultar el pago real
+      // Obtener pago real
       const paymentRes = await fetch(
         `https://api.mercadopago.com/v1/payments/${paymentId}`,
         {
           headers: {
-            Authorization: `Bearer ${ACCESS_TOKEN}`,
+            Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
           },
         }
       );
@@ -143,28 +140,19 @@ app.post("/webhook", async (req, res) => {
       if (payment.status === "approved") {
         console.log("✅ PAGO APROBADO — GUARDANDO PEDIDO");
 
-    // 1️⃣ Leer los pedidos que ya existen
-        const orders = JSON.parse(fs.readFileSync("orders.json", "utf8"));
-
-    // 2️⃣ Crear el nuevo pedido
         const newOrder = {
-            payment_id: payment.id,
-            date: new Date().toISOString(),
-            amount: payment.transaction_amount,
-            status: payment.status,
-            buyer_id: order.payer?.id,
-            items: order.items
+          payment_id: payment.id,
+          date: new Date().toISOString(),
+          amount: payment.transaction_amount,
+          status: payment.status,
+          buyer_id: order.payer?.id,
+          items: order.items,
         };
 
-    // 3️⃣ Agregar el pedido al archivo
-        orders.push(newOrder);
+        await Order.create(newOrder);
 
-    // 4️⃣ Guardar archivo actualizado
-        fs.writeFileSync("orders.json", JSON.stringify(orders, null, 2));
-
-        console.log("📦 PEDIDO GUARDADO EN orders.json");
-    }
-
+        console.log("📦 PEDIDO GUARDADO EN MONGODB");
+      }
     }
 
     res.sendStatus(200);
@@ -172,4 +160,9 @@ app.post("/webhook", async (req, res) => {
     console.error("Error webhook:", error);
     res.sendStatus(500);
   }
+});
+
+// ===== INICIAR SERVIDOR =====
+app.listen(PORT, () => {
+  console.log(`Servidor corriendo en puerto ${PORT}`);
 });
