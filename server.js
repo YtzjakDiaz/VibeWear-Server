@@ -1,6 +1,7 @@
 import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
+import fs from "fs";
 
 const app = express();
 const PORT = 3000;
@@ -135,8 +136,30 @@ app.post("/webhook", async (req, res) => {
       console.log(payment.transaction_amount);
 
       if (payment.status === "approved") {
-        console.log("✅ PAGO APROBADO — GUARDAR PEDIDO");
-      }
+        console.log("✅ PAGO APROBADO — GUARDANDO PEDIDO");
+
+    // 1️⃣ Leer los pedidos que ya existen
+        const orders = JSON.parse(fs.readFileSync("orders.json", "utf8"));
+
+    // 2️⃣ Crear el nuevo pedido
+        const newOrder = {
+            payment_id: payment.id,
+            date: new Date().toISOString(),
+            amount: payment.transaction_amount,
+            status: payment.status,
+            buyer_id: order.payer?.id,
+            items: order.items
+        };
+
+    // 3️⃣ Agregar el pedido al archivo
+        orders.push(newOrder);
+
+    // 4️⃣ Guardar archivo actualizado
+        fs.writeFileSync("orders.json", JSON.stringify(orders, null, 2));
+
+        console.log("📦 PEDIDO GUARDADO EN orders.json");
+    }
+
     }
 
     res.sendStatus(200);
