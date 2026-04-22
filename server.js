@@ -94,28 +94,34 @@ app.post("/webhook", async (req, res) => {
     console.log("🔔 WEBHOOK RECIBIDO");
     console.log(req.body);
 
-    const paymentId = req.body?.data?.id;
-
-    if (!paymentId) {
+    // MercadoPago envía MUCHOS eventos → solo queremos PAGOS
+    if (req.body.type !== "payment") {
+      console.log("Evento ignorado:", req.body.type);
       return res.sendStatus(200);
     }
 
+    const paymentId = req.body.data.id;
+
     // Consultar el pago real a MercadoPago
-    const response = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-      headers: {
-        Authorization: `Bearer ${ACCESS_TOKEN}`,
-      },
-    });
+    const response = await fetch(
+      `https://api.mercadopago.com/v1/payments/${paymentId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${ACCESS_TOKEN}`,
+        },
+      }
+    );
 
     const payment = await response.json();
 
-    console.log("💰 PAGO DETALLE:");
-    console.log(payment.status);
-    console.log(payment.transaction_amount);
+    console.log("💰 DETALLE DEL PAGO:");
+    console.log("Estado:", payment.status);
+    console.log("Monto:", payment.transaction_amount);
+    console.log("Email comprador:", payment.payer.email);
 
     if (payment.status === "approved") {
       console.log("✅ PAGO APROBADO — GUARDAR PEDIDO");
-      // aquí luego guardaremos pedidos
+      // aquí en el siguiente paso guardaremos pedidos reales
     }
 
     res.sendStatus(200);
