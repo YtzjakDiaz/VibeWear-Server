@@ -4,12 +4,18 @@ import cors from "cors";
 import mongoose from "mongoose";
 
 const orderSchema = new mongoose.Schema({
-  payment_id: { type: Number, unique: true }, // 👈 evita duplicados a nivel DB
-  date: String,
+  order_id: String,
+  payment_id: Number,
+  name: String,
+  email: String,
+  phone: String,
+  address: String,
+  city: String,
+  zipCode: String,
+  items: Array,
   amount: Number,
   status: String,
-  buyer_id: Number,
-  items: Array,
+  date: String,
 });
 
 const Order = mongoose.model("Order", orderSchema);
