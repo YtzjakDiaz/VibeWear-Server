@@ -79,6 +79,9 @@ app.post("/create-preference", async (req, res) => {
         metadata: {
           customer: req.body.customer
         },
+
+        notification_url: "https://vibewear-server-w0z2.onrender.com/webhook",
+
         back_urls: {
           success: "https://ytzjakdiaz.github.io/VibeWear/files/success.html",
           failure: "https://ytzjakdiaz.github.io/VibeWear/files/failure.html",
