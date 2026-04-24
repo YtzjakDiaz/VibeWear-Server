@@ -2,6 +2,15 @@ import express from "express";
 import fetch from "node-fetch";
 import cors from "cors";
 import mongoose from "mongoose";
+import nodemailer from "nodemailer";
+
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
 
 const orderSchema = new mongoose.Schema({
   order_id: String,
@@ -181,6 +190,9 @@ app.post("/webhook", async (req, res) => {
     };
 
     await Order.create(newOrder);
+    
+    // 🔥 enviar email
+    await sendConfirmationEmail(newOrder);
 
     console.log("✅ PEDIDO GUARDADO EN MONGODB");
 
@@ -196,3 +208,32 @@ app.post("/webhook", async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en puerto ${PORT}`);
 });
+
+async function sendConfirmationEmail(order) {
+  try {
+    await transporter.sendMail({
+      from: `"VibeWear" <${process.env.EMAIL_USER}>`,
+      to: order.email,
+      subject: "🖤 Confirmación de tu pedido - VibeWear",
+      html: `
+        <h2>¡Pago confirmado!</h2>
+        <p>Hola ${order.name},</p>
+
+        <p>Tu pedido fue aprobado ✅</p>
+
+        <h3>🧾 Detalles:</h3>
+        <p><strong>Orden:</strong> ${order.order_id}</p>
+        <p><strong>Total:</strong> $${order.amount}</p>
+
+        <h3>📦 Dirección:</h3>
+        <p>${order.address}</p>
+
+        <p>Gracias por comprar en VibeWear 🖤</p>
+      `,
+    });
+
+    console.log("📧 Email enviado");
+  } catch (error) {
+    console.error("❌ Error enviando email:", error);
+  }
+}
