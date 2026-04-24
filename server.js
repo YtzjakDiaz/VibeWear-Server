@@ -214,21 +214,48 @@ async function sendConfirmationEmail(order) {
       to: order.email,
       subject: "🖤 Confirmación de tu pedido - VibeWear",
       html: `
-        <h2>¡Pago confirmado!</h2>
-        <p>Hola ${order.name},</p>
+      <div style="background:#0a0a0a;padding:40px;font-family:Arial,sans-serif;color:#fff;">
+  
+        <div style="max-width:600px;margin:auto;background:#111;border-radius:12px;overflow:hidden;border:1px solid rgba(224,162,201,0.2);">
 
-        <p>Tu pedido fue aprobado ✅</p>
+          <!-- HEADER -->
+            <div style="background:#000;padding:20px;text-align:center;border-bottom:1px solid rgba(224,162,201,0.2);">
+              <h1 style="color:#e0a2c9;margin:0;letter-spacing:2px;">VIBEWEAR</h1>
+            </div>
 
-        <h3>🧾 Detalles:</h3>
-        <p><strong>Orden:</strong> ${order.order_id}</p>
-        <p><strong>Total:</strong> $${order.amount}</p>
+          <!-- BODY -->
+            <div style="padding:30px;text-align:center;">
+              <h2 style="color:#e0a2c9;">🖤 ¡Pago confirmado!</h2>
+      
+              <p style="color:#ccc;">Hola <strong>${order.name}</strong>,</p>
+              <p style="color:#aaa;">Tu pedido ha sido aprobado correctamente.</p>
 
-        <h3>📦 Dirección:</h3>
-        <p>${order.address}</p>
+          <!-- CARD -->
+            <div style="background:rgba(224,162,201,0.08);border:1px solid rgba(224,162,201,0.2);border-radius:10px;padding:20px;margin:30px 0;">
+        
+              <p style="font-size:12px;color:#888;letter-spacing:2px;">NÚMERO DE ORDEN</p>
+              <h2 style="color:#e0a2c9;margin:10px 0;">${order.order_id}</h2>
 
-        <p>Gracias por comprar en VibeWear 🖤</p>
-      `,
-    });
+              <p style="margin-top:20px;color:#aaa;">💰 Total: <strong>$${order.amount}</strong></p>
+              <p style="color:#aaa;">📦 Dirección: ${order.address}</p>
+            </div>
+
+          <!-- BOTÓN -->
+            <a href="https://ytzjakdiaz.github.io/VibeWear/" style="display:inline-block;margin-top:20px;padding:14px 30px;background:#e0a2c9;color:#000;text-decoration:none;border-radius:6px;font-weight:bold;letter-spacing:1px;"> VER TIENDA </a>
+
+        </div>
+
+          <!-- FOOTER -->
+            <div style="background:#000;padding:20px;text-align:center;border-top:1px solid rgba(224,162,201,0.2);">
+              <p style="color:#777;font-size:12px;margin:0;">
+              © VibeWear — Streetwear Culture
+              </p>
+            </div>
+
+        </div>
+      </div>
+    `,
+  });
 
     console.log("📧 Email enviado");
   } catch (error) {
