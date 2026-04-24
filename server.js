@@ -76,6 +76,9 @@ app.post("/create-preference", async (req, res) => {
       },
       body: JSON.stringify({
         items: req.body.items,
+        metadata: {
+          customer: req.body.customer
+        },
         back_urls: {
           success: "https://ytzjakdiaz.github.io/VibeWear/files/success.html",
           failure: "https://ytzjakdiaz.github.io/VibeWear/files/failure.html",
@@ -115,6 +118,7 @@ app.post("/webhook", async (req, res) => {
   try {
     console.log("🔔 WEBHOOK RECIBIDO");
     console.log(req.body);
+    console.log("🧠 METADATA:", order.metadata);
 
     const merchantOrderId = req.body?.id;
     if (!merchantOrderId) return res.sendStatus(200);
@@ -180,7 +184,7 @@ app.post("/webhook", async (req, res) => {
           items: order.items,
           amount: payment.transaction_amount,
           status: payment.status,
-          date: new Date().toISOString,
+          date: new Date().toISOString(),
         };
 
         await Order.create(newOrder);
