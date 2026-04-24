@@ -130,6 +130,7 @@ app.post("/webhook", async (req, res) => {
     );
 
     const order = await response.json();
+    const customer = order.metadata?.customer || {};
 
     console.log("📦 ORDEN MERCADOPAGO:");
     console.log(order);
@@ -166,12 +167,20 @@ app.post("/webhook", async (req, res) => {
         console.log("✅ PAGO APROBADO — GUARDANDO PEDIDO");
 
         const newOrder = {
+          order_id: "VW-" + Date.now(),
           payment_id: payment.id,
-          date: new Date().toISOString(),
+
+          name: customer.name,
+          email: customer.email,
+          phone: customer.phone,
+          address: customer.address,
+          city: customer.city,
+          zipCode: customer.zipCode,
+
+          items: order.items,
           amount: payment.transaction_amount,
           status: payment.status,
-          buyer_id: order.payer?.id,
-          items: order.items,
+          date: new Date().toISOString,
         };
 
         await Order.create(newOrder);
