@@ -168,7 +168,7 @@ app.post("/webhook", async (req, res) => {
 
     // 💾 GUARDAR EN MONGO
     const newOrder = {
-      order_id: customer.order_id || "VW-" + Date.now(),
+      order_id: "VW-" + payment.id,
       payment_id: payment.id,
       name: customer.name,
       email: customer.email,
