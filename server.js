@@ -7,7 +7,7 @@ import nodemailer from "nodemailer";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== CONFIG EMAIL =====
+// ===== EMAIL CONFIG =====
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// ===== MODELO MONGO =====
+// ===== MONGO MODEL =====
 const orderSchema = new mongoose.Schema({
   order_id: String,
   payment_id: Number,
@@ -34,7 +34,7 @@ const orderSchema = new mongoose.Schema({
 
 const Order = mongoose.model("Order", orderSchema);
 
-// ===== MIDDLEWARES =====
+// ===== MIDDLEWARE =====
 app.use(cors());
 app.use(express.json());
 
@@ -43,7 +43,7 @@ app.get("/", (req, res) => {
   res.json({ message: "Servidor corriendo correctamente" });
 });
 
-// ===== CREAR PREFERENCIA =====
+// ===== CREATE PREFERENCE =====
 app.post("/create-preference", async (req, res) => {
   try {
     const response = await fetch(
@@ -76,14 +76,10 @@ app.post("/create-preference", async (req, res) => {
 
     const data = await response.json();
 
-    console.log("🟡 Preferencia creada:");
-    console.log(data);
+    console.log("🟡 Preferencia creada:", data.id);
 
     if (!data.init_point) {
-      return res.status(400).json({
-        error: "MercadoPago error",
-        details: data,
-      });
+      return res.status(400).json({ error: data });
     }
 
     res.json({ init_point: data.init_point });
@@ -93,7 +89,7 @@ app.post("/create-preference", async (req, res) => {
   }
 });
 
-// ===== CONEXIÓN MONGO =====
+// ===== MONGO CONNECT =====
 mongoose
   .connect(process.env.MONGO_URL)
   .then(() => console.log("🟢 MongoDB conectado"))
@@ -107,22 +103,17 @@ app.post("/webhook", async (req, res) => {
 
     let paymentId;
 
-    // Caso 1
     if (req.body.type === "payment") {
       paymentId = req.body.data?.id;
     }
 
-    // Caso 2
     if (req.body.topic === "payment") {
       paymentId = req.body.resource;
     }
 
-    if (!paymentId) {
-      console.log("⚠️ No hay paymentId");
-      return res.sendStatus(200);
-    }
+    if (!paymentId) return res.sendStatus(200);
 
-    // ===== CONSULTAR PAGO =====
+    // 🔍 Consultar pago real
     const paymentRes = await fetch(
       `https://api.mercadopago.com/v1/payments/${paymentId}`,
       {
@@ -134,27 +125,24 @@ app.post("/webhook", async (req, res) => {
 
     const payment = await paymentRes.json();
 
-    console.log("💰 Estado del pago:", payment.status);
+    console.log("💰 Estado:", payment.status);
 
     if (payment.status !== "approved") {
-      console.log("⏳ Pago no aprobado");
       return res.sendStatus(200);
     }
 
-    // ===== DATOS CLIENTE =====
     const customer = payment.metadata?.customer || {};
 
     console.log("👤 CUSTOMER:", customer);
 
-    // ===== EVITAR DUPLICADOS =====
+    // 🛑 Evitar duplicados
     const existing = await Order.findOne({ payment_id: payment.id });
-
     if (existing) {
       console.log("⚠️ Pedido ya existe");
       return res.sendStatus(200);
     }
 
-    // ===== CREAR ORDEN =====
+    // 💾 Crear orden
     const newOrder = {
       order_id: "VW-" + payment.id,
       payment_id: payment.id,
@@ -170,19 +158,16 @@ app.post("/webhook", async (req, res) => {
       date: new Date().toISOString(),
     };
 
-    console.log("📦 ORDEN FINAL:", newOrder);
+    console.log("📦 ORDEN:", newOrder);
 
     await Order.create(newOrder);
 
-    // ===== ENVIAR EMAIL =====
-    if (newOrder.email && newOrder.email.trim() !== "") {
-      console.log("📨 Enviando email a:", newOrder.email);
+    // 📧 EMAIL
+    if (newOrder.email) {
       await sendConfirmationEmail(newOrder);
-    } else {
-      console.log("⚠️ Email no válido");
     }
 
-    console.log("✅ Pedido guardado en MongoDB");
+    console.log("✅ Guardado + Email enviado");
 
     res.sendStatus(200);
   } catch (error) {
@@ -191,56 +176,91 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
-// ===== EMAIL =====
+// ===== EMAIL FUNCTION =====
 async function sendConfirmationEmail(order) {
   try {
-    console.log("📨 Intentando enviar email a:", order.email);
+    console.log("📨 Enviando email a:", order.email);
+
+    const itemsHTML = order.items
+      .map(
+        (item) => `
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,0.05);">
+          <div style="color:#ccc;">
+            <div>${item.title}</div>
+            <div style="font-size:12px;color:#777;">x${item.quantity}</div>
+          </div>
+          <div style="color:#e0a2c9;font-weight:bold;">
+            $${new Intl.NumberFormat("es-CO").format(
+              item.unit_price * item.quantity
+            )}
+          </div>
+        </div>
+      `
+      )
+      .join("");
 
     await transporter.sendMail({
       from: `"VibeWear" <${process.env.EMAIL_USER}>`,
       to: order.email,
       subject: "🖤 Confirmación de tu pedido - VibeWear",
       html: `
-      <div style="background:#0a0a0a;padding:40px;font-family:Arial,sans-serif;color:#fff;">
-        <div style="max-width:600px;margin:auto;background:#111;border-radius:12px;overflow:hidden;border:1px solid rgba(224,162,201,0.2);">
+<div style="background:#0a0a0a;padding:40px;font-family:Arial,sans-serif;color:#fff;">
+  <div style="max-width:600px;margin:auto;background:#111;border-radius:12px;overflow:hidden;border:1px solid rgba(224,162,201,0.2);">
 
-          <div style="background:#000;padding:20px;text-align:center;">
-            <h1 style="color:#e0a2c9;margin:0;">VIBEWEAR</h1>
-          </div>
+    <div style="background:#000;padding:25px;text-align:center;">
+      <h1 style="color:#e0a2c9;margin:0;font-size:32px;letter-spacing:3px;">
+        VIBEWEAR
+      </h1>
+    </div>
 
-          <div style="padding:30px;text-align:center;">
-            <h2 style="color:#e0a2c9;">🖤 ¡Pago confirmado!</h2>
-            <p>Hola <strong>${order.name}</strong>,</p>
-            <p>Tu pedido fue aprobado correctamente.</p>
+    <div style="padding:30px;">
+      
+      <h2 style="color:#e0a2c9;text-align:center;">
+        🖤 ¡Pago confirmado!
+      </h2>
 
-            <div style="background:rgba(224,162,201,0.08);padding:20px;border-radius:10px;margin:20px 0;">
-              <p style="font-size:12px;color:#888;">ORDEN</p>
-              <h2 style="color:#e0a2c9;">${order.order_id}</h2>
+      <p style="color:#ccc;text-align:center;">
+        Hola <strong>${order.name}</strong>,
+      </p>
 
-              <p>💰 Total: <strong>$${order.amount}</strong></p>
-              <p>📦 Dirección: ${order.address}</p>
-            </div>
+      <p style="color:#aaa;text-align:center;margin-bottom:30px;">
+        Tu pedido fue aprobado correctamente.
+      </p>
 
-            <a href="https://ytzjakdiaz.github.io/VibeWear/" 
-              style="display:inline-block;padding:14px 30px;background:#e0a2c9;color:#000;text-decoration:none;border-radius:6px;">
-              VER TIENDA
-            </a>
-          </div>
-
-          <div style="background:#000;padding:20px;text-align:center;">
-            <p style="color:#777;font-size:12px;">
-              © VibeWear — Streetwear Culture
-            </p>
-          </div>
-
-        </div>
+      <div style="margin-bottom:30px;">
+        <h3 style="color:#e0a2c9;">🛍️ Tu pedido</h3>
+        ${itemsHTML}
       </div>
+
+      <div style="background:rgba(224,162,201,0.08);border:1px solid rgba(224,162,201,0.2);border-radius:10px;padding:20px;">
+        <p style="font-size:11px;color:#888;">ORDEN</p>
+        <h2 style="color:#e0a2c9;">${order.order_id}</h2>
+
+        <p>💰 Total: <strong>$${new Intl.NumberFormat("es-CO").format(
+          order.amount
+        )}</strong></p>
+
+        <p>📦 ${order.address}</p>
+        <p>🏙️ ${order.city}</p>
+        <p>📮 ${order.zipCode}</p>
+      </div>
+
+    </div>
+
+    <div style="background:#000;padding:20px;text-align:center;">
+      <p style="color:#777;font-size:12px;">
+        © VibeWear — Streetwear Culture
+      </p>
+    </div>
+
+  </div>
+</div>
       `,
     });
 
-    console.log("📧 Email enviado correctamente");
+    console.log("📧 Email enviado");
   } catch (error) {
-    console.error("❌ Error enviando email:", error);
+    console.error("❌ Error email:", error);
   }
 }
 
@@ -251,13 +271,22 @@ app.get("/test-email", async (req, res) => {
     email: "TUEMAIL@gmail.com",
     order_id: "VW-TEST",
     amount: 10000,
-    address: "Test address",
+    address: "Test",
+    city: "Barranquilla",
+    zipCode: "080001",
+    items: [
+      {
+        title: "Camiseta Test",
+        quantity: 1,
+        unit_price: 10000,
+      },
+    ],
   });
 
   res.send("Email enviado");
 });
 
-// ===== INICIAR SERVER =====
+// ===== START =====
 app.listen(PORT, () => {
   console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
 });
