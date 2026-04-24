@@ -116,19 +116,28 @@ mongoose
   .then(() => console.log("🟢 MongoDB conectado"))
   .catch((err) => console.log("🔴 Error MongoDB:", err));
 
-// ===== WEBHOOK MERCADOPAGO =====
 app.post("/webhook", async (req, res) => {
   try {
     console.log("🔔 WEBHOOK RECIBIDO");
     console.log(req.body);
-    console.log("🧠 METADATA:", order.metadata);
 
-    const merchantOrderId = req.body?.id;
-    if (!merchantOrderId) return res.sendStatus(200);
+    let paymentId;
 
-    // Obtener orden
-    const response = await fetch(
-      `https://api.mercadopago.com/merchant_orders/${merchantOrderId}`,
+    // 📌 Caso 1: viene como payment
+    if (req.body.type === "payment") {
+      paymentId = req.body.data.id;
+    }
+
+    // 📌 Caso 2: viene como topic
+    if (req.body.topic === "payment") {
+      paymentId = req.body.resource;
+    }
+
+    if (!paymentId) return res.sendStatus(200);
+
+    // 🔍 Consultar pago real
+    const paymentRes = await fetch(
+      `https://api.mercadopago.com/v1/payments/${paymentId}`,
       {
         headers: {
           Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
@@ -136,69 +145,49 @@ app.post("/webhook", async (req, res) => {
       }
     );
 
-    const order = await response.json();
-    const customer = order.metadata?.customer || {};
+    const payment = await paymentRes.json();
 
-    console.log("📦 ORDEN MERCADOPAGO:");
-    console.log(order);
+    console.log("💰 PAGO:", payment.status);
 
-    if (order.payments && order.payments.length > 0) {
-      const paymentId = order.payments[0].id;
-
-      // Obtener pago real
-      const paymentRes = await fetch(
-        `https://api.mercadopago.com/v1/payments/${paymentId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.MP_ACCESS_TOKEN}`,
-          },
-        }
-      );
-
-      const payment = await paymentRes.json();
-
-      console.log("💰 PAGO DETALLE:");
-      console.log(payment.status);
-      console.log(payment.transaction_amount);
-
-      if (payment.status === "approved") {
-
-        // 🔥 EVITAR DUPLICADOS
-        const existingOrder = await Order.findOne({ payment_id: payment.id });
-
-        if (existingOrder) {
-          console.log("⚠️ Pedido ya existe, no duplicar");
-          return res.sendStatus(200);
-        }
-
-        console.log("✅ PAGO APROBADO — GUARDANDO PEDIDO");
-
-        const newOrder = {
-          order_id: customer.order_id || "VW-" + Date.now(),
-          payment_id: payment.id,
-
-          name: customer.name,
-          email: customer.email,
-          phone: customer.phone,
-          address: customer.address,
-          city: customer.city,
-          zipCode: customer.zipCode,
-
-          items: order.items,
-          amount: payment.transaction_amount,
-          status: payment.status,
-          date: new Date().toISOString(),
-        };
-
-        await Order.create(newOrder);
-
-        console.log("📦 PEDIDO GUARDADO EN MONGODB");
-      }
+    if (payment.status !== "approved") {
+      return res.sendStatus(200);
     }
 
+    // 🔍 Obtener metadata (TU INFO DEL CLIENTE)
+    const metadata = payment.metadata || {};
+    const customer = metadata.customer || {};
+
+    console.log("👤 CUSTOMER:", customer);
+
+    // 🛑 EVITAR DUPLICADOS
+    const existing = await Order.findOne({ payment_id: payment.id });
+    if (existing) {
+      console.log("⚠️ Pedido ya existe");
+      return res.sendStatus(200);
+    }
+
+    // 💾 GUARDAR EN MONGO
+    const newOrder = {
+      order_id: customer.order_id || "VW-" + Date.now(),
+      payment_id: payment.id,
+      name: customer.name,
+      email: customer.email,
+      phone: customer.phone,
+      address: customer.address,
+      amount: payment.transaction_amount,
+      status: payment.status,
+      date: new Date().toISOString(),
+      items: payment.additional_info?.items || []
+    };
+
+    await Order.create(newOrder);
+
+    console.log("✅ PEDIDO GUARDADO EN MONGODB");
+
     res.sendStatus(200);
+
   } catch (error) {
-    console.error("Error webhook:", error);
+    console.error("❌ Error webhook:", error);
     res.sendStatus(500);
   }
 });
