@@ -262,3 +262,15 @@ async function sendConfirmationEmail(order) {
     console.error("❌ Error enviando email:", error);
   }
 }
+
+app.get("/test-email", async (req, res) => {
+  await sendConfirmationEmail({
+    name: "Test",
+    email: "soysebashablemosporfa@gmail.com",
+    order_id: "VW-TEST",
+    amount: 10000,
+    address: "Test address"
+  });
+
+  res.send("Email enviado");
+});
