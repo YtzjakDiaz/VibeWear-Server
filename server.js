@@ -190,8 +190,6 @@ app.post("/webhook", async (req, res) => {
     };
 
     await Order.create(newOrder);
-    
-    // 🔥 enviar email
     await sendConfirmationEmail(newOrder);
 
     console.log("✅ PEDIDO GUARDADO EN MONGODB");
